@@ -16,6 +16,8 @@ import java.util.UUID;
 public class CrashIslandSavedData extends SavedData {
     public static final String STORAGE_ID = "skylore_crash_islands";
 
+    private static final int VERSION = 2;
+
     private int nextSpawnSeq;
     private final Map<UUID, Long> playerCells = new HashMap<>();
     private final Map<Long, UUID> claimedCells = new HashMap<>();
@@ -41,10 +43,8 @@ public class CrashIslandSavedData extends SavedData {
             long key = pack(row.getInt("cellX"), row.getInt("cellZ"));
             data.playerCells.put(uuid, key);
         }
-        ListTag claimed = tag.getList("claimed", Tag.TAG_COMPOUND);
-        for (int i = 0; i < claimed.size(); i++) {
-            CompoundTag row = claimed.getCompound(i);
-            data.claimedCells.put(pack(row.getInt("cellX"), row.getInt("cellZ")), row.getUUID("uuid"));
+        for (Map.Entry<UUID, Long> entry : data.playerCells.entrySet()) {
+            data.claimedCells.put(entry.getValue(), entry.getKey());
         }
         ListTag built = tag.getList("built", Tag.TAG_COMPOUND);
         for (int i = 0; i < built.size(); i++) {
@@ -60,6 +60,7 @@ public class CrashIslandSavedData extends SavedData {
     }
 
     public CompoundTag save(CompoundTag tag) {
+        tag.putInt("version", VERSION);
         tag.putInt("nextSpawnSeq", nextSpawnSeq);
         ListTag players = new ListTag();
         for (Map.Entry<UUID, Long> entry : playerCells.entrySet()) {
@@ -70,15 +71,6 @@ public class CrashIslandSavedData extends SavedData {
             players.add(row);
         }
         tag.put("players", players);
-        ListTag claimed = new ListTag();
-        for (Map.Entry<Long, UUID> entry : claimedCells.entrySet()) {
-            CompoundTag row = new CompoundTag();
-            row.putInt("cellX", unpackX(entry.getKey()));
-            row.putInt("cellZ", unpackZ(entry.getKey()));
-            row.putUUID("uuid", entry.getValue());
-            claimed.add(row);
-        }
-        tag.put("claimed", claimed);
         ListTag built = new ListTag();
         for (long key : builtCells) {
             CompoundTag row = new CompoundTag();
@@ -103,6 +95,15 @@ public class CrashIslandSavedData extends SavedData {
         playerCells.put(uuid, key);
         claimedCells.put(key, uuid);
         setDirty();
+    }
+
+    /** Drops a player's lease (e.g. the island could not be built) so the cell can be reused. */
+    public void release(UUID uuid) {
+        Long key = playerCells.remove(uuid);
+        if (key != null) {
+            claimedCells.remove(key);
+            setDirty();
+        }
     }
 
     public boolean isClaimed(int cellX, int cellZ) {

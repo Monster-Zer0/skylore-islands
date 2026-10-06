@@ -1,6 +1,7 @@
 package com.skylore.islands.gameplay;
 
 import com.skylore.islands.config.SkyloreConfig;
+import com.skylore.islands.worldgen.IslandLayoutBinder;
 import com.skylore.islands.worldgen.density.CellularIslandDensityFunction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -44,6 +45,7 @@ public class VoidFallProtectionHandler {
 
     private static void rescuePlayerToNearestIsland(ServerPlayer player) {
         ServerLevel level = player.serverLevel();
+        IslandLayoutBinder.bindFromLevel(level);
         int px = player.getBlockX();
         int pz = player.getBlockZ();
 

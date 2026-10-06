@@ -1,5 +1,6 @@
 package com.skylore.islands.mixin;
 
+import com.skylore.islands.SkyloreIslands;
 import com.skylore.islands.worldgen.density.CellularIslandDensityFunction;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.world.level.block.Blocks;
@@ -27,7 +28,13 @@ public abstract class RandomStateMixin {
             long seed,
             CallbackInfoReturnable<RandomState> cir
     ) {
-        CellularIslandDensityFunction.setWorldSeed(seed);
+        long current = CellularIslandDensityFunction.worldSeed();
+        if (current != seed) {
+            if (current != 0L) {
+                SkyloreIslands.LOGGER.warn("RandomState seed {} differs from active world seed {}; using it for island layout", seed, current);
+            }
+            CellularIslandDensityFunction.setWorldSeed(seed);
+        }
         boolean nether = settings.defaultBlock().is(Blocks.NETHERRACK);
         CellularIslandDensityFunction.setLayoutSalt(
                 nether ? CellularIslandDensityFunction.NETHER_SALT : CellularIslandDensityFunction.OVERWORLD_SALT);

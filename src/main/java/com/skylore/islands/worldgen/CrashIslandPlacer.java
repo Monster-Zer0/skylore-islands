@@ -113,31 +113,34 @@ public final class CrashIslandPlacer {
         int maxCz = ((anchorZ + size.getZ()) >> 4) + 1;
 
         Set<Long> forced = new HashSet<>();
-        for (int cx = minCx; cx <= maxCx; cx++) {
-            for (int cz = minCz; cz <= maxCz; cz++) {
-                long packed = ChunkPos.asLong(cx, cz);
-                if (!level.getForcedChunks().contains(packed)) {
-                    level.setChunkForced(cx, cz, true);
-                    forced.add(packed);
-                }
-                level.getChunk(cx, cz);
-            }
-        }
-
-        StructurePlaceSettings settings = new StructurePlaceSettings()
-                .setRotation(Rotation.NONE)
-                .setMirror(Mirror.NONE)
-                .setIgnoreEntities(false);
-        BlockPos origin = new BlockPos(anchorX, anchorY, anchorZ);
-        StructureIslandPolicy.allowVoidPlacement(true);
         boolean ok;
         try {
-            ok = template.placeInWorld(level, origin, origin, settings, level.random, 3);
+            for (int cx = minCx; cx <= maxCx; cx++) {
+                for (int cz = minCz; cz <= maxCz; cz++) {
+                    long packed = ChunkPos.asLong(cx, cz);
+                    if (!level.getForcedChunks().contains(packed)) {
+                        level.setChunkForced(cx, cz, true);
+                        forced.add(packed);
+                    }
+                    level.getChunk(cx, cz);
+                }
+            }
+
+            StructurePlaceSettings settings = new StructurePlaceSettings()
+                    .setRotation(Rotation.NONE)
+                    .setMirror(Mirror.NONE)
+                    .setIgnoreEntities(false);
+            BlockPos origin = new BlockPos(anchorX, anchorY, anchorZ);
+            StructureIslandPolicy.allowVoidPlacement(true);
+            try {
+                ok = template.placeInWorld(level, origin, origin, settings, level.random, 3);
+            } finally {
+                StructureIslandPolicy.allowVoidPlacement(false);
+            }
         } finally {
-            StructureIslandPolicy.allowVoidPlacement(false);
-        }
-        for (long packed : forced) {
-            level.setChunkForced(ChunkPos.getX(packed), ChunkPos.getZ(packed), false);
+            for (long packed : forced) {
+                level.setChunkForced(ChunkPos.getX(packed), ChunkPos.getZ(packed), false);
+            }
         }
         if (!ok) {
             SkyloreIslands.LOGGER.error("Failed to paste crash island at {}, {}, {}", anchorX, anchorY, anchorZ);

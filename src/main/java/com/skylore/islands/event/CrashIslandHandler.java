@@ -4,6 +4,7 @@ import com.skylore.islands.SkyloreIslands;
 import com.skylore.islands.config.SkyloreConfig;
 import com.skylore.islands.worldgen.CrashIslandCells;
 import com.skylore.islands.worldgen.CrashIslandPlacer;
+import com.skylore.islands.worldgen.IslandLayoutBinder;
 import com.skylore.islands.worldgen.CrashIslandSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
@@ -35,8 +36,14 @@ public class CrashIslandHandler {
         if (!SkyloreConfig.crashIslandsEnabled() || player.level().dimension() != Level.OVERWORLD) {
             return;
         }
-        boolean firstTime = CrashIslandSavedData.get(overworld(player)).assignedCell(player.getUUID()) == null;
-        schedule(player, LOGIN_DELAY_TICKS, firstTime);
+        CrashIslandSavedData data = CrashIslandSavedData.get(overworld(player));
+        int[] assigned = data.assignedCell(player.getUUID());
+        if (assigned == null) {
+            schedule(player, LOGIN_DELAY_TICKS, true);
+        } else if (!data.isBuilt(assigned[0], assigned[1])) {
+            schedule(player, LOGIN_DELAY_TICKS, false);
+        }
+        // Already housed: leave the player where they logged out.
     }
 
     @SubscribeEvent
@@ -45,6 +52,10 @@ public class CrashIslandHandler {
             return;
         }
         if (!SkyloreConfig.crashIslandsEnabled() || player.level().dimension() != Level.OVERWORLD) {
+            return;
+        }
+        // A bed, anchor or the stored crash-island spawn wins; only fall back when none is left.
+        if (player.getRespawnPosition() != null) {
             return;
         }
         schedule(player, RESPAWN_DELAY_TICKS, false);
@@ -66,12 +77,14 @@ public class CrashIslandHandler {
             return;
         }
         ServerLevel level = player.serverLevel();
+        IslandLayoutBinder.bindFromLevel(level);
         Assignment assignment = ensureAssignment(player, level);
         if (assignment == null) {
             return;
         }
         if (!assignment.built) {
             if (!CrashIslandPlacer.paste(level, assignment.site)) {
+                CrashIslandSavedData.get(overworld(player)).release(player.getUUID());
                 player.sendSystemMessage(Component.literal("Could not build your crash island."));
                 return;
             }
@@ -81,7 +94,10 @@ public class CrashIslandHandler {
         Vec3 stand = CrashIslandPlacer.findStand(level, assignment.site);
         player.teleportTo(stand.x, stand.y, stand.z);
         BlockPos spawn = BlockPos.containing(stand);
-        player.setRespawnPosition(Level.OVERWORLD, spawn, player.getYRot(), true, false);
+        if (announce || player.getRespawnPosition() == null) {
+            // forced: vanilla clears non-forced spawns that have no bed/anchor block.
+            player.setRespawnPosition(Level.OVERWORLD, spawn, player.getYRot(), true, false);
+        }
         if (announce) {
             SkyloreIslands.LOGGER.info("Crash island for {} at cell {},{} -> {}",
                     player.getGameProfile().getName(), assignment.site.cellX, assignment.site.cellZ, spawn);
