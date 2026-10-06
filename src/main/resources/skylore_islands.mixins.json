@@ -1,0 +1,38 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.skylore.islands.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "StructureMixin",
+    "JigsawStructureMixin",
+    "StructureTemplateMixin",
+    "StructureTemplatePaletteMixin",
+    "StructurePieceMixin",
+    "TemplateStructurePieceMixin",
+    "MineshaftStructureMixin",
+    "StrongholdStructureMixin",
+    "OceanMonumentStructureMixin",
+    "SkyWaterStructureMixin",
+    "StructurePiecesBuilderAccessor",
+    "NoiseChunkMixin",
+    "FlowingFluidMixin",
+    "WorldCarverMixin",
+    "NoiseBasedChunkGeneratorMixin",
+    "RandomStateMixin",
+    "NetherFortressStructureMixin",
+    "HeightRangePlacementMixin",
+    "OreFeatureMixin",
+    "WaterAnimalMixin",
+    "TurtleMixin",
+    "ChunkGeneratorMixin",
+    "PlacedFeatureMixin",
+    "ServerLevelMixin",
+    "LevelChunkMixin",
+    "ChunkAccessMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

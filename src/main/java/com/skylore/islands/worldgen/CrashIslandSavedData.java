@@ -1,0 +1,139 @@
+package com.skylore.islands.worldgen;
+
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.saveddata.SavedData;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+public class CrashIslandSavedData extends SavedData {
+    public static final String STORAGE_ID = "skylore_crash_islands";
+
+    private int nextSpawnSeq;
+    private final Map<UUID, Long> playerCells = new HashMap<>();
+    private final Map<Long, UUID> claimedCells = new HashMap<>();
+    private final Set<Long> builtCells = new HashSet<>();
+
+    public static CrashIslandSavedData get(ServerLevel overworld) {
+        return overworld.getDataStorage().computeIfAbsent(
+                new SavedData.Factory<>(CrashIslandSavedData::new, CrashIslandSavedData::load, null),
+                STORAGE_ID);
+    }
+
+    public static CrashIslandSavedData load(CompoundTag tag, HolderLookup.Provider registries) {
+        return load(tag);
+    }
+
+    public static CrashIslandSavedData load(CompoundTag tag) {
+        CrashIslandSavedData data = new CrashIslandSavedData();
+        data.nextSpawnSeq = tag.getInt("nextSpawnSeq");
+        ListTag players = tag.getList("players", Tag.TAG_COMPOUND);
+        for (int i = 0; i < players.size(); i++) {
+            CompoundTag row = players.getCompound(i);
+            UUID uuid = row.getUUID("uuid");
+            long key = pack(row.getInt("cellX"), row.getInt("cellZ"));
+            data.playerCells.put(uuid, key);
+        }
+        ListTag claimed = tag.getList("claimed", Tag.TAG_COMPOUND);
+        for (int i = 0; i < claimed.size(); i++) {
+            CompoundTag row = claimed.getCompound(i);
+            data.claimedCells.put(pack(row.getInt("cellX"), row.getInt("cellZ")), row.getUUID("uuid"));
+        }
+        ListTag built = tag.getList("built", Tag.TAG_COMPOUND);
+        for (int i = 0; i < built.size(); i++) {
+            CompoundTag row = built.getCompound(i);
+            data.builtCells.add(pack(row.getInt("cellX"), row.getInt("cellZ")));
+        }
+        return data;
+    }
+
+    @Override
+    public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
+        return save(tag);
+    }
+
+    public CompoundTag save(CompoundTag tag) {
+        tag.putInt("nextSpawnSeq", nextSpawnSeq);
+        ListTag players = new ListTag();
+        for (Map.Entry<UUID, Long> entry : playerCells.entrySet()) {
+            CompoundTag row = new CompoundTag();
+            row.putUUID("uuid", entry.getKey());
+            row.putInt("cellX", unpackX(entry.getValue()));
+            row.putInt("cellZ", unpackZ(entry.getValue()));
+            players.add(row);
+        }
+        tag.put("players", players);
+        ListTag claimed = new ListTag();
+        for (Map.Entry<Long, UUID> entry : claimedCells.entrySet()) {
+            CompoundTag row = new CompoundTag();
+            row.putInt("cellX", unpackX(entry.getKey()));
+            row.putInt("cellZ", unpackZ(entry.getKey()));
+            row.putUUID("uuid", entry.getValue());
+            claimed.add(row);
+        }
+        tag.put("claimed", claimed);
+        ListTag built = new ListTag();
+        for (long key : builtCells) {
+            CompoundTag row = new CompoundTag();
+            row.putInt("cellX", unpackX(key));
+            row.putInt("cellZ", unpackZ(key));
+            built.add(row);
+        }
+        tag.put("built", built);
+        return tag;
+    }
+
+    public int[] assignedCell(UUID uuid) {
+        Long key = playerCells.get(uuid);
+        if (key == null) {
+            return null;
+        }
+        return new int[]{unpackX(key), unpackZ(key)};
+    }
+
+    public void assign(UUID uuid, int cellX, int cellZ) {
+        long key = pack(cellX, cellZ);
+        playerCells.put(uuid, key);
+        claimedCells.put(key, uuid);
+        setDirty();
+    }
+
+    public boolean isClaimed(int cellX, int cellZ) {
+        return claimedCells.containsKey(pack(cellX, cellZ));
+    }
+
+    public boolean isBuilt(int cellX, int cellZ) {
+        return builtCells.contains(pack(cellX, cellZ));
+    }
+
+    public void markBuilt(int cellX, int cellZ) {
+        builtCells.add(pack(cellX, cellZ));
+        setDirty();
+    }
+
+    public int takeNextSeq() {
+        int seq = nextSpawnSeq;
+        nextSpawnSeq++;
+        setDirty();
+        return seq;
+    }
+
+    public static long pack(int cellX, int cellZ) {
+        return ((long) cellX << 32) ^ (cellZ & 0xFFFFFFFFL);
+    }
+
+    public static int unpackX(long key) {
+        return (int) (key >> 32);
+    }
+
+    public static int unpackZ(long key) {
+        return (int) key;
+    }
+}

@@ -1,0 +1,32 @@
+# Gradle build output
+.gradle/
+build/
+bin/
+out/
+
+# IDE / editor
+.cursor/
+debug-*.log
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+
+# NeoForge / Minecraft run directory
+run/
+logs/
+crash-reports/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Built jars
+libs/
+.git-broken-backup/

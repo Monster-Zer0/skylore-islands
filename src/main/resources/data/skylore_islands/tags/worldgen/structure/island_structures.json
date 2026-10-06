@@ -1,0 +1,22 @@
+{
+  "replace": false,
+  "values": [
+    "#minecraft:village",
+    "minecraft:pillager_outpost",
+    "minecraft:mineshaft",
+    "minecraft:mineshaft_mesa",
+    "minecraft:ruined_portal",
+    "minecraft:ruined_portal_desert",
+    "minecraft:ruined_portal_jungle",
+    "minecraft:ruined_portal_mountain",
+    "minecraft:ruined_portal_swamp",
+    "minecraft:mansion",
+    "minecraft:jungle_pyramid",
+    "minecraft:desert_pyramid",
+    "minecraft:swamp_hut",
+    "minecraft:igloo",
+    "minecraft:trail_ruins",
+    "minecraft:stronghold",
+    "ad_astra:oil_well"
+  ]
+}
