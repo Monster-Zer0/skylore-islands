@@ -40,20 +40,23 @@
       "shift_z": "minecraft:shift_z"
     },
     "continents": {
-      "type": "skylore_islands:ocean_continentalness",
-      "cell_size": 384,
-      "min_altitude": 20,
-      "max_altitude": 260,
-      "min_radius": 45,
-      "max_radius": 170,
-      "base_continents": {
-        "type": "minecraft:shifted_noise",
-        "noise": "minecraft:continentalness",
-        "xz_scale": 0.25,
-        "y_scale": 0.0,
-        "shift_x": "minecraft:shift_x",
-        "shift_y": 0.0,
-        "shift_z": "minecraft:shift_z"
+      "type": "minecraft:flat_cache",
+      "argument": {
+        "type": "skylore_islands:ocean_continentalness",
+        "cell_size": 384,
+        "min_altitude": 20,
+        "max_altitude": 260,
+        "min_radius": 45,
+        "max_radius": 170,
+        "base_continents": {
+          "type": "minecraft:shifted_noise",
+          "noise": "minecraft:continentalness",
+          "xz_scale": 0.25,
+          "y_scale": 0.0,
+          "shift_x": "minecraft:shift_x",
+          "shift_y": 0.0,
+          "shift_z": "minecraft:shift_z"
+        }
       }
     },
     "erosion": {
@@ -85,12 +88,15 @@
       "max_radius": 170
     },
     "final_density": {
-      "type": "skylore_islands:cellular_island",
-      "cell_size": 384,
-      "min_altitude": 20,
-      "max_altitude": 260,
-      "min_radius": 45,
-      "max_radius": 170
+      "type": "minecraft:interpolated",
+      "argument": {
+        "type": "skylore_islands:cellular_island",
+        "cell_size": 384,
+        "min_altitude": 20,
+        "max_altitude": 260,
+        "min_radius": 45,
+        "max_radius": 170
+      }
     },
     "vein_toggle": 0,
     "vein_ridged": 0,
@@ -293,11 +299,26 @@
   },
   "spawn_target": [
     {
-      "temperature": [-1.0, 1.0],
-      "humidity": [-1.0, 1.0],
-      "continentalness": [-1.0, 1.0],
-      "erosion": [-1.0, 1.0],
-      "weirdness": [-1.0, 1.0],
+      "temperature": [
+        -1.0,
+        1.0
+      ],
+      "humidity": [
+        -1.0,
+        1.0
+      ],
+      "continentalness": [
+        -1.0,
+        1.0
+      ],
+      "erosion": [
+        -1.0,
+        1.0
+      ],
+      "weirdness": [
+        -1.0,
+        1.0
+      ],
       "depth": 0.0,
       "offset": 0.0
     }

@@ -415,39 +415,16 @@ public final class IslandVolume {
     }
 
     static final class ColumnDensityCache {
-        long worldSeed;
-        long layoutSalt;
-        int islandDensity = -1;
-        int cellSize;
-        int minAlt;
-        int maxAlt;
-        int minRad;
-        int maxRad;
-        final java.util.HashMap<Long, ColumnDensity> map = new java.util.HashMap<>(128);
+        final LongKeyedCache<ColumnDensity> cache = new LongKeyedCache<>(4096);
 
         ColumnDensity get(int x, int z, int cellSize, int minAlt, int maxAlt, int minRad, int maxRad) {
-            int density = SkyloreConfig.islandDensity();
-            if (worldSeed != CellularIslandDensityFunction.worldSeed() || layoutSalt != CellularIslandDensityFunction.layoutSalt() || this.cellSize != cellSize
-                    || this.minAlt != minAlt || this.maxAlt != maxAlt || this.minRad != minRad
-                    || this.maxRad != maxRad || islandDensity != density) {
-                map.clear();
-                worldSeed = CellularIslandDensityFunction.worldSeed();
-                layoutSalt = CellularIslandDensityFunction.layoutSalt();
-                this.cellSize = cellSize;
-                this.minAlt = minAlt;
-                this.maxAlt = maxAlt;
-                this.minRad = minRad;
-                this.maxRad = maxRad;
-                islandDensity = density;
-            }
+            cache.validate(LongKeyedCache.stamp(CellularIslandDensityFunction.worldSeed(), CellularIslandDensityFunction.layoutSalt(),
+                    cellSize, minAlt, maxAlt, minRad, maxRad, SkyloreConfig.islandDensity()));
             long key = IslandLayout.packedXZ(x, z);
-            ColumnDensity column = map.get(key);
+            ColumnDensity column = cache.get(key);
             if (column == null) {
-                if (map.size() > 1024) {
-                    map.clear();
-                }
                 column = buildColumnDensity(x, z, cellSize, minAlt, maxAlt, minRad, maxRad);
-                map.put(key, column);
+                cache.put(key, column);
             }
             return column;
         }

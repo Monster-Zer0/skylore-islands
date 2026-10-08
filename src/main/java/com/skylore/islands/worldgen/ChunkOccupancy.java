@@ -8,9 +8,6 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 /**
  * Per-chunk occupancy ticket. VOID skips biome features, initial light, and random ticks.
@@ -53,10 +50,11 @@ public final class ChunkOccupancy {
         public boolean restrictRandomTicks() {
             return kind == Kind.ISLAND;
         }
+
+        /** 256-bit mask of columns with island stone under them; built lazily, never persisted. */
+        private volatile long[] islandColumns;
     }
 
-    private static final Map<ChunkAccess, Ticket> ATTACHED = Collections.synchronizedMap(new WeakHashMap<>());
-    private static final Map<ChunkAccess, Boolean> LIGHT_REPAIR = Collections.synchronizedMap(new WeakHashMap<>());
     private static final ThreadLocal<Boolean> SKIP_BIOME_FEATURES = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     private ChunkOccupancy() {}
@@ -65,7 +63,7 @@ public final class ChunkOccupancy {
         if (chunk == null) {
             return new Ticket(Kind.UNKNOWN, 0, 0);
         }
-        Ticket attached = ATTACHED.get(chunk);
+        Ticket attached = attached(chunk);
         if (attached != null && attached.kind != Kind.UNKNOWN) {
             return attached;
         }
@@ -99,7 +97,7 @@ public final class ChunkOccupancy {
     }
 
     public static void notePlacedBlock(ChunkAccess chunk, int blockY) {
-        Ticket ticket = ATTACHED.get(chunk);
+        Ticket ticket = attached(chunk);
         if (ticket == null || ticket.kind == Kind.UNKNOWN) {
             return;
         }
@@ -136,17 +134,17 @@ public final class ChunkOccupancy {
     }
 
     public static void copy(ChunkAccess from, ChunkAccess to) {
-        Ticket ticket = ATTACHED.get(from);
+        Ticket ticket = attached(from);
         if (ticket != null && ticket.kind != Kind.UNKNOWN) {
             put(to, ticket);
         }
-        if (LIGHT_REPAIR.remove(from) == Boolean.TRUE) {
-            LIGHT_REPAIR.put(to, Boolean.TRUE);
+        if (takeLightRepair(from)) {
+            ((OccupancyHolder) to).skylore$setNeedsLightRepair(true);
         }
     }
 
     public static void writeToChunkNbt(ChunkAccess chunk, CompoundTag data) {
-        Ticket ticket = ATTACHED.get(chunk);
+        Ticket ticket = attached(chunk);
         if (ticket == null || ticket.kind == Kind.UNKNOWN) {
             return;
         }
@@ -162,21 +160,60 @@ public final class ChunkOccupancy {
         if (ticket != null) {
             put(chunk, ticket);
             if (!root.getBoolean(NBT_LIGHT_OK)) {
-                LIGHT_REPAIR.put(chunk, Boolean.TRUE);
+                ((OccupancyHolder) chunk).skylore$setNeedsLightRepair(true);
             }
         }
     }
 
     public static boolean takeLightRepair(ChunkAccess chunk) {
-        return LIGHT_REPAIR.remove(chunk) == Boolean.TRUE;
+        OccupancyHolder holder = (OccupancyHolder) chunk;
+        boolean pending = holder.skylore$needsLightRepair();
+        if (pending) {
+            holder.skylore$setNeedsLightRepair(false);
+        }
+        return pending;
     }
 
     public static void markLightOk(ChunkAccess chunk) {
-        LIGHT_REPAIR.remove(chunk);
+        ((OccupancyHolder) chunk).skylore$setNeedsLightRepair(false);
+    }
+
+    private static Ticket attached(ChunkAccess chunk) {
+        return ((OccupancyHolder) chunk).skylore$getTicket();
     }
 
     private static void put(ChunkAccess chunk, Ticket ticket) {
-        ATTACHED.put(chunk, ticket);
+        ((OccupancyHolder) chunk).skylore$setTicket(ticket);
+    }
+
+    /**
+     * Island column test from the chunk's cached mask. Caller must have bound the layout salt
+     * for the chunk's dimension.
+     */
+    public static boolean hasIslandColumn(ChunkAccess chunk, int blockX, int blockZ) {
+        Ticket ticket = get(chunk);
+        if (ticket.skipAllRandomTicks()) {
+            return false;
+        }
+        long[] mask = ticket.islandColumns;
+        if (mask == null) {
+            mask = buildColumnMask(chunk.getPos());
+            ticket.islandColumns = mask;
+        }
+        int bit = (blockX & 15) | ((blockZ & 15) << 4);
+        return (mask[bit >>> 6] & (1L << (bit & 63))) != 0;
+    }
+
+    private static long[] buildColumnMask(ChunkPos pos) {
+        long[] mask = new long[4];
+        int x0 = pos.getMinBlockX();
+        int z0 = pos.getMinBlockZ();
+        for (int bit = 0; bit < 256; bit++) {
+            if (CellularIslandDensityFunction.hasIslandColumn(x0 + (bit & 15), z0 + (bit >>> 4))) {
+                mask[bit >>> 6] |= 1L << (bit & 63);
+            }
+        }
+        return mask;
     }
 
     private static boolean hasStructureStart(ChunkAccess chunk) {

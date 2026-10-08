@@ -36,12 +36,8 @@ public abstract class FlowingFluidMixin {
         if (!fluidState.is(FluidTags.WATER) && !fluidState.is(FluidTags.LAVA)) {
             return;
         }
-        if (isVoidOccupancy(level, pos)) {
-            ci.cancel();
-            return;
-        }
         bindLayout(level);
-        if (!CellularIslandDensityFunction.hasIslandColumn(pos.getX(), pos.getZ())) {
+        if (!hasIslandColumn(level, pos)) {
             ci.cancel();
             return;
         }
@@ -57,25 +53,21 @@ public abstract class FlowingFluidMixin {
         if (!state.is(FluidTags.WATER) && !state.is(FluidTags.LAVA)) {
             return;
         }
-        if (isVoidOccupancy(level, pos)) {
-            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-            ci.cancel();
-            return;
-        }
         CellularIslandDensityFunction.bindFromLevel(level);
-        if (!CellularIslandDensityFunction.hasIslandColumn(pos.getX(), pos.getZ())) {
+        if (!hasIslandColumn(level, pos)) {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
             ci.cancel();
         }
     }
 
-    private static boolean isVoidOccupancy(LevelAccessor level, BlockPos pos) {
+    /** Per-chunk cached mask (VOID chunks are all-false); layout search only if the chunk isn't loaded. */
+    private static boolean hasIslandColumn(LevelAccessor level, BlockPos pos) {
         int cx = pos.getX() >> 4;
         int cz = pos.getZ() >> 4;
         if (!level.hasChunk(cx, cz)) {
-            return false;
+            return CellularIslandDensityFunction.hasIslandColumn(pos.getX(), pos.getZ());
         }
-        return ChunkOccupancy.get(level.getChunk(cx, cz)).skipAllRandomTicks();
+        return ChunkOccupancy.hasIslandColumn(level.getChunk(cx, cz), pos.getX(), pos.getZ());
     }
 
     private static void bindLayout(LevelAccessor level) {

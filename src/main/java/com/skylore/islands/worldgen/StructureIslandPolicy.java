@@ -45,7 +45,7 @@ public final class StructureIslandPolicy {
     private static final ThreadLocal<Boolean> ALLOW_VOID_PLACEMENT = ThreadLocal.withInitial(() -> false);
     /** Set by jigsaw adapter when a void-craft stub is produced; consumed by StructureMixin. */
     private static final ThreadLocal<Boolean> VOID_CRAFT_STUB = ThreadLocal.withInitial(() -> false);
-    private static final ThreadLocal<Object[]> NEAR_ISLAND_CACHE = ThreadLocal.withInitial(() -> new Object[]{Long.MIN_VALUE, null});
+    private static final ThreadLocal<IslandLayout.LayoutSlot> NEAR_ISLAND_CACHE = ThreadLocal.withInitial(IslandLayout.LayoutSlot::new);
 
     public static void allowVoidPlacement(boolean on) {
         ALLOW_VOID_PLACEMENT.set(on);
@@ -249,14 +249,15 @@ public final class StructureIslandPolicy {
     }
 
     private static CellularIslandDensityFunction.IslandLayout nearbyIsland(int x, int z) {
-        long key = ChunkPos.asLong(x >> 4, z >> 4);
-        Object[] cache = NEAR_ISLAND_CACHE.get();
-        if ((Long) cache[0] == key) {
-            return (CellularIslandDensityFunction.IslandLayout) cache[1];
+        long key = CellularIslandDensityFunction.worldSeed() ^ CellularIslandDensityFunction.layoutSalt()
+                ^ ChunkPos.asLong(x >> 4, z >> 4);
+        IslandLayout.LayoutSlot cache = NEAR_ISLAND_CACHE.get();
+        if (cache.key == key) {
+            return cache.layout;
         }
         CellularIslandDensityFunction.IslandLayout found = scanAdjacentCells(x, z);
-        cache[0] = key;
-        cache[1] = found;
+        cache.key = key;
+        cache.layout = found;
         return found;
     }
 

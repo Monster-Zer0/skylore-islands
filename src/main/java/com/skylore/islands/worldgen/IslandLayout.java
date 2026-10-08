@@ -28,11 +28,12 @@ public final class IslandLayout {
     static final ThreadLocal<CellularIslandDensityFunction.IslandLayout[]> NEARBY_LAYOUTS =
             ThreadLocal.withInitial(() -> new CellularIslandDensityFunction.IslandLayout[9]);
     static final ThreadLocal<long[]> NEARBY_META = ThreadLocal.withInitial(() -> new long[]{Long.MIN_VALUE, 0L});
-    static final ThreadLocal<Object[]> FOOTPRINT_CACHE = ThreadLocal.withInitial(() -> new Object[]{Long.MIN_VALUE, Boolean.FALSE});
+    static final ThreadLocal<long[]> FOOTPRINT_CACHE = ThreadLocal.withInitial(() -> new long[]{Long.MIN_VALUE, 0L});
     static final ThreadLocal<long[]> CHUNK_INSIDE_CACHE = ThreadLocal.withInitial(() -> new long[]{Long.MIN_VALUE, 0L});
-    private static final ThreadLocal<LayoutCache> LAYOUT_CACHE = ThreadLocal.withInitial(LayoutCache::new);
+    private static final ThreadLocal<LongKeyedCache<CellularIslandDensityFunction.IslandLayout>> LAYOUT_CACHE =
+            ThreadLocal.withInitial(() -> new LongKeyedCache<>(1024));
     private static final ThreadLocal<WarpCache> WARP_CACHE = ThreadLocal.withInitial(WarpCache::new);
-    private static final ThreadLocal<Object[]> LAYOUT_CONTAINING_CACHE = ThreadLocal.withInitial(() -> new Object[]{Long.MIN_VALUE, null});
+    private static final ThreadLocal<LayoutSlot> LAYOUT_CONTAINING_CACHE = ThreadLocal.withInitial(LayoutSlot::new);
 
     private IslandLayout() {
     }
@@ -46,32 +47,18 @@ public final class IslandLayout {
     }
 
     public static CellularIslandDensityFunction.IslandLayout layoutForCell(int cx, int cz, int cellSize, int minAlt, int maxAlt, int minRad, int maxRad) {
-        LayoutCache cache = LAYOUT_CACHE.get();
-        int density = SkyloreConfig.islandDensity();
-        if (cache.worldSeed != CellularIslandDensityFunction.worldSeed() || cache.layoutSalt != CellularIslandDensityFunction.layoutSalt() || cache.cellSize != cellSize || cache.minAlt != minAlt || cache.maxAlt != maxAlt
-                || cache.minRad != minRad || cache.maxRad != maxRad || cache.islandDensity != density) {
-            cache.map.clear();
-            cache.worldSeed = CellularIslandDensityFunction.worldSeed();
-            cache.layoutSalt = CellularIslandDensityFunction.layoutSalt();
-            cache.cellSize = cellSize;
-            cache.minAlt = minAlt;
-            cache.maxAlt = maxAlt;
-            cache.minRad = minRad;
-            cache.maxRad = maxRad;
-            cache.islandDensity = density;
-        }
+        LongKeyedCache<CellularIslandDensityFunction.IslandLayout> cache = LAYOUT_CACHE.get();
+        cache.validate(LongKeyedCache.stamp(CellularIslandDensityFunction.worldSeed(), CellularIslandDensityFunction.layoutSalt(),
+                cellSize, minAlt, maxAlt, minRad, maxRad, SkyloreConfig.islandDensity()));
         long key = ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
-        CellularIslandDensityFunction.IslandLayout cached = cache.map.get(key);
+        CellularIslandDensityFunction.IslandLayout cached = cache.get(key);
         if (cached != null) {
             return cached.archetype < 0 ? null : cached;
         }
 
         long cellHash = hashCoordinates(cx, cz, placementSalt());
         if (!doesCellHaveIsland(cx, cz, cellHash)) {
-            if (cache.map.size() > 1024) {
-                cache.map.clear();
-            }
-            cache.map.put(key, ABSENT_LAYOUT);
+            cache.put(key, ABSENT_LAYOUT);
             return null;
         }
 
@@ -84,10 +71,7 @@ public final class IslandLayout {
 
         CellularIslandDensityFunction.IslandLayout layout = new CellularIslandDensityFunction.IslandLayout(cx, cz, cx * cellSize + offset[0], cz * cellSize + offset[1],
                 altitude, baseRadius, archetype, isMega, cellHash);
-        if (cache.map.size() > 1024) {
-            cache.map.clear();
-        }
-        cache.map.put(key, layout);
+        cache.put(key, layout);
         return layout;
     }
 
@@ -385,9 +369,9 @@ public final class IslandLayout {
             return ChunkGenColumnCache.layoutAt(x, z);
         }
         long key = CellularIslandDensityFunction.worldSeed() ^ CellularIslandDensityFunction.layoutSalt() ^ (((long) x) << 32) ^ (z & 0xFFFFFFFFL);
-        Object[] cache = LAYOUT_CONTAINING_CACHE.get();
-        if ((Long) cache[0] == key) {
-            return (CellularIslandDensityFunction.IslandLayout) cache[1];
+        LayoutSlot cache = LAYOUT_CONTAINING_CACHE.get();
+        if (cache.key == key) {
+            return cache.layout;
         }
         CellularIslandDensityFunction.IslandLayout layout = findLayoutContainingUncached(x, z,
                 SkyloreConfig.cellSize(),
@@ -395,8 +379,8 @@ public final class IslandLayout {
                 SkyloreConfig.maxIslandAltitude(),
                 SkyloreConfig.minIslandRadius(),
                 SkyloreConfig.maxIslandRadius());
-        cache[0] = key;
-        cache[1] = layout;
+        cache.key = key;
+        cache.layout = layout;
         return layout;
     }
 
@@ -702,16 +686,16 @@ public final class IslandLayout {
     }
 
     public static void rememberFootprint(int x, int z, boolean onFootprint) {
-        Object[] cache = FOOTPRINT_CACHE.get();
+        long[] cache = FOOTPRINT_CACHE.get();
         cache[0] = CellularIslandDensityFunction.worldSeed() ^ CellularIslandDensityFunction.layoutSalt() ^ packedXZ(x, z);
-        cache[1] = onFootprint;
+        cache[1] = onFootprint ? 1L : 0L;
     }
 
     public static boolean columnOnFootprintCached(int x, int z, double wx, double wz, CellularIslandDensityFunction.IslandLayout[] nearby, int nearbyCount) {
         long key = CellularIslandDensityFunction.worldSeed() ^ CellularIslandDensityFunction.layoutSalt() ^ packedXZ(x, z);
-        Object[] cache = FOOTPRINT_CACHE.get();
-        if ((Long) cache[0] == key) {
-            return Boolean.TRUE.equals(cache[1]);
+        long[] cache = FOOTPRINT_CACHE.get();
+        if (cache[0] == key) {
+            return cache[1] != 0L;
         }
         boolean on = false;
         for (int i = 0; i < nearbyCount; i++) {
@@ -721,7 +705,7 @@ public final class IslandLayout {
             }
         }
         cache[0] = key;
-        cache[1] = on;
+        cache[1] = on ? 1L : 0L;
         return on;
     }
 
@@ -743,20 +727,15 @@ public final class IslandLayout {
         }
     }
 
+    /** Single-entry cache without a boxed key. */
+    public static final class LayoutSlot {
+        public long key = Long.MIN_VALUE;
+        public CellularIslandDensityFunction.IslandLayout layout;
+    }
+
     private static final class WarpCache {
         long key = Long.MIN_VALUE;
         WarpedPoint point;
     }
 
-    private static final class LayoutCache {
-        long worldSeed;
-        long layoutSalt;
-        int islandDensity = -1;
-        int cellSize;
-        int minAlt;
-        int maxAlt;
-        int minRad;
-        int maxRad;
-        final java.util.HashMap<Long, CellularIslandDensityFunction.IslandLayout> map = new java.util.HashMap<>(64);
-    }
 }

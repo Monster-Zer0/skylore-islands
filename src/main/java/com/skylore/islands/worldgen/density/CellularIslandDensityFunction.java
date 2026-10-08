@@ -37,7 +37,7 @@ public class CellularIslandDensityFunction implements DensityFunction.SimpleFunc
     public static final CellularIslandDensityFunction INSTANCE = new CellularIslandDensityFunction();
 
     private static volatile long WORLD_SEED = 0L;
-    private static final ThreadLocal<Long> LAYOUT_SALT = ThreadLocal.withInitial(() -> OVERWORLD_SALT);
+    private static final ThreadLocal<long[]> LAYOUT_SALT = ThreadLocal.withInitial(() -> new long[]{OVERWORLD_SALT});
 
     public static void setWorldSeed(long seed) {
         WORLD_SEED = seed;
@@ -48,11 +48,11 @@ public class CellularIslandDensityFunction implements DensityFunction.SimpleFunc
     }
 
     public static void setLayoutSalt(long salt) {
-        LAYOUT_SALT.set(salt);
+        LAYOUT_SALT.get()[0] = salt;
     }
 
     public static long layoutSalt() {
-        return LAYOUT_SALT.get();
+        return LAYOUT_SALT.get()[0];
     }
 
     public static boolean usingNetherLayout() {
