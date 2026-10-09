@@ -8,6 +8,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
 
 /**
@@ -46,6 +47,21 @@ public final class StructureIslandPolicy {
     /** Set by jigsaw adapter when a void-craft stub is produced; consumed by StructureMixin. */
     private static final ThreadLocal<Boolean> VOID_CRAFT_STUB = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<IslandLayout.LayoutSlot> NEAR_ISLAND_CACHE = ThreadLocal.withInitial(IslandLayout.LayoutSlot::new);
+
+    /** Overall box of the structure start currently being placed on this thread, or null. */
+    private static final ThreadLocal<BoundingBox> PLACING = new ThreadLocal<>();
+
+    public static void beginStructurePlacement(BoundingBox box) {
+        PLACING.set(box);
+    }
+
+    public static void endStructurePlacement() {
+        PLACING.remove();
+    }
+
+    public static BoundingBox activePlacementBox() {
+        return PLACING.get();
+    }
 
     public static void allowVoidPlacement(boolean on) {
         ALLOW_VOID_PLACEMENT.set(on);

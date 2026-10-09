@@ -29,7 +29,9 @@
     "PlacedFeatureMixin",
     "ServerLevelMixin",
     "LevelChunkMixin",
-    "ChunkAccessMixin"
+    "ChunkAccessMixin",
+    "StructureStartMixin",
+    "ProtoChunkMixin"
   ],
   "client": [],
   "injectors": {

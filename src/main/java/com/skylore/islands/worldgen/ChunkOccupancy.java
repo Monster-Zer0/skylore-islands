@@ -119,6 +119,7 @@ public final class ChunkOccupancy {
 
     public static void endDecoration() {
         SKIP_BIOME_FEATURES.set(Boolean.FALSE);
+        StructureIslandPolicy.endStructurePlacement();
     }
 
     public static boolean skipBiomeFeatures() {
